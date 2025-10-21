@@ -18,10 +18,14 @@ try:
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
+    from webdriver_manager.chrome import ChromeDriverManager
     SELENIUM_AVAILABLE = True
-except ImportError:
+    WEBDRIVER_MANAGER_AVAILABLE = True
+except ImportError as e:
     SELENIUM_AVAILABLE = False
-    print("Warning: Selenium not available. Install with: pip install selenium")
+    WEBDRIVER_MANAGER_AVAILABLE = False
+    print(f"Warning: Selenium/webdriver-manager not available. Install with: pip install selenium webdriver-manager")
+    print(f"Error details: {e}")
 
 try:
     from bs4 import BeautifulSoup
@@ -86,7 +90,19 @@ class GoogleAIModeScraper:
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
 
-        self.driver = webdriver.Chrome(options=chrome_options)
+        # Use webdriver-manager to automatically handle ChromeDriver versions
+        try:
+            if WEBDRIVER_MANAGER_AVAILABLE:
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            else:
+                # Fallback to using system ChromeDriver
+                self.driver = webdriver.Chrome(options=chrome_options)
+        except Exception as e:
+            print(f"Error initializing ChromeDriver: {e}")
+            print("Tip: Install webdriver-manager with: pip install webdriver-manager")
+            raise
+
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
     def _build_google_url(self, query: str, language: str = 'en', region: str = 'US') -> str:
