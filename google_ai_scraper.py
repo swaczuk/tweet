@@ -132,7 +132,7 @@ class GoogleAIModeScraper:
         base_url = 'https://www.google.com/search'
         return f"{base_url}?{urlencode(params)}"
 
-    def scrape(self, query: str, language: str = 'en', region: str = 'US', wait_time: int = 5, verbose: bool = False) -> AIModeScrapeResult:
+    def scrape(self, query: str, language: str = 'en', region: str = 'US', wait_time: int = 5, verbose: bool = False, wait_for_user: bool = False) -> AIModeScrapeResult:
         """
         Scrape Google AI Mode results
 
@@ -142,6 +142,7 @@ class GoogleAIModeScraper:
             region: Region code
             wait_time: Time to wait for page load (seconds)
             verbose: Print debug information
+            wait_for_user: Wait for user input before extracting (useful for CAPTCHAs)
 
         Returns:
             AIModeScrapeResult with extracted data
@@ -163,6 +164,24 @@ class GoogleAIModeScraper:
             if verbose:
                 print(f"⏳ Waiting {wait_time} seconds for page to load...")
             time.sleep(wait_time)
+
+            # Check for CAPTCHA
+            page_content_check = self.page.content()
+            if 'captcha' in page_content_check.lower() or 'recaptcha' in page_content_check.lower():
+                if verbose:
+                    print("⚠️  CAPTCHA detected!")
+                wait_for_user = True
+
+            # Wait for user to solve CAPTCHA if needed
+            if wait_for_user:
+                print("\n" + "="*60)
+                print("🤖 PAUSED - Solve the CAPTCHA in the browser window")
+                print("="*60)
+                print("After solving the CAPTCHA, press ENTER to continue...")
+                input()
+                print("✅ Continuing...\n")
+                # Give extra time after CAPTCHA
+                time.sleep(3)
 
             # Get page content
             page_content = self.page.content()

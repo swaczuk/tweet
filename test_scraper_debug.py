@@ -24,7 +24,14 @@ def test_scraper():
 
     # Create scraper with visible browser
     with GoogleAIModeScraper(headless=False) as scraper:
-        result = scraper.scrape(query=query, language="en", region="US", wait_time=8, verbose=True)
+        result = scraper.scrape(
+            query=query,
+            language="en",
+            region="US",
+            wait_time=5,
+            verbose=True,
+            wait_for_user=True  # Will pause automatically if CAPTCHA detected
+        )
 
         print("\n" + "=" * 60)
         print("RESULTS")
