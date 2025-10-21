@@ -14,13 +14,14 @@ CORS(app)
 
 # Initialize scraper (shared instance)
 scraper = None
+DEBUG_MODE = False  # Set to True to show browser window
 
 
 def get_scraper():
     """Get or create scraper instance"""
     global scraper
     if scraper is None:
-        scraper = GoogleAIModeScraper(headless=True)
+        scraper = GoogleAIModeScraper(headless=not DEBUG_MODE)
     return scraper
 
 
@@ -156,10 +157,16 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', type=int, default=5000, help='Port to run server on')
     parser.add_argument('-H', '--host', default='127.0.0.1', help='Host to bind to')
     parser.add_argument('-d', '--debug', action='store_true', help='Run in debug mode')
+    parser.add_argument('--show-browser', action='store_true', help='Show browser window (for debugging)')
 
     args = parser.parse_args()
 
+    # Set debug mode if --show-browser is enabled
+    DEBUG_MODE = args.show_browser
+
     print(f"Starting Google AI Mode Scraper API on {args.host}:{args.port}")
+    if DEBUG_MODE:
+        print("⚠️  DEBUG MODE: Browser window will be VISIBLE")
     print(f"Open http://{args.host}:{args.port} in your browser")
 
     app.run(host=args.host, port=args.port, debug=args.debug)

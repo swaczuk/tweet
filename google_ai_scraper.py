@@ -132,7 +132,7 @@ class GoogleAIModeScraper:
         base_url = 'https://www.google.com/search'
         return f"{base_url}?{urlencode(params)}"
 
-    def scrape(self, query: str, language: str = 'en', region: str = 'US', wait_time: int = 5) -> AIModeScrapeResult:
+    def scrape(self, query: str, language: str = 'en', region: str = 'US', wait_time: int = 5, verbose: bool = False) -> AIModeScrapeResult:
         """
         Scrape Google AI Mode results
 
@@ -141,6 +141,7 @@ class GoogleAIModeScraper:
             language: Language code
             region: Region code
             wait_time: Time to wait for page load (seconds)
+            verbose: Print debug information
 
         Returns:
             AIModeScrapeResult with extracted data
@@ -153,34 +154,52 @@ class GoogleAIModeScraper:
         try:
             # Navigate to Google Search
             url = self._build_google_url(query, language, region)
+            if verbose:
+                print(f"🔗 Navigating to: {url}")
+
             self.page.goto(url, wait_until='networkidle', timeout=30000)
 
             # Wait for page to load completely
+            if verbose:
+                print(f"⏳ Waiting {wait_time} seconds for page to load...")
             time.sleep(wait_time)
 
             # Get page content
             page_content = self.page.content()
             soup = BeautifulSoup(page_content, 'html.parser')
 
+            if verbose:
+                print(f"📄 Page loaded, HTML size: {len(page_content)} bytes")
+                print(f"🔍 Extracting AI Overview...")
+
             # Extract AI Overview/Summary
-            result.ai_overview = self._extract_ai_overview(soup)
+            result.ai_overview = self._extract_ai_overview(soup, verbose=verbose)
+
+            if verbose:
+                print(f"🔍 Extracting search results...")
 
             # Extract search results
-            result.results = self._extract_search_results(soup)
+            result.results = self._extract_search_results(soup, verbose=verbose)
+
+            if verbose:
+                print(f"✅ Extraction complete!")
+                print(f"   - AI Overview: {'Found' if result.ai_overview else 'Not found'}")
+                print(f"   - Results: {len(result.results)} found")
 
         except Exception as e:
-            print(f"Error during scraping: {e}")
+            print(f"❌ Error during scraping: {e}")
             import traceback
             traceback.print_exc()
 
         return result
 
-    def _extract_ai_overview(self, soup: BeautifulSoup) -> Optional[str]:
+    def _extract_ai_overview(self, soup: BeautifulSoup, verbose: bool = False) -> Optional[str]:
         """
         Extract AI-generated overview text
 
         Args:
             soup: BeautifulSoup object of the page
+            verbose: Print debug information
 
         Returns:
             AI overview text or None
@@ -199,6 +218,9 @@ class GoogleAIModeScraper:
 
         for selector in ai_selectors:
             elements = soup.select(selector)
+            if verbose and elements:
+                print(f"   Found {len(elements)} elements with selector: {selector}")
+
             if elements:
                 # Get text from all matching elements
                 text_parts = []
@@ -208,16 +230,21 @@ class GoogleAIModeScraper:
                         text_parts.append(text)
 
                 if text_parts:
+                    if verbose:
+                        print(f"   ✅ AI Overview extracted ({len(' '.join(text_parts))} chars)")
                     return ' '.join(text_parts)
 
+        if verbose:
+            print(f"   ⚠️  No AI Overview found with any selector")
         return None
 
-    def _extract_search_results(self, soup: BeautifulSoup) -> List[SearchResult]:
+    def _extract_search_results(self, soup: BeautifulSoup, verbose: bool = False) -> List[SearchResult]:
         """
         Extract regular search results with AI highlights
 
         Args:
             soup: BeautifulSoup object of the page
+            verbose: Print debug information
 
         Returns:
             List of SearchResult objects
@@ -228,7 +255,10 @@ class GoogleAIModeScraper:
         # Google uses various class names, these are common ones
         result_divs = soup.select('div.g, div[data-sokoban-container], div.Gx5Zad, div.MjjYud')
 
-        for div in result_divs:
+        if verbose:
+            print(f"   Found {len(result_divs)} potential result containers")
+
+        for i, div in enumerate(result_divs):
             try:
                 # Extract title
                 title_elem = div.select_one('h3')
@@ -264,10 +294,18 @@ class GoogleAIModeScraper:
                         meta_description=meta_description,
                         ai_highlight=ai_highlight
                     ))
+                    if verbose:
+                        print(f"   ✓ Result {len(results)}: {title[:50]}...")
+                elif verbose:
+                    print(f"   ✗ Skipped div {i+1}: title='{title[:30] if title else 'none'}', url='{url[:50] if url else 'none'}'")
 
             except Exception as e:
-                print(f"Error extracting result: {e}")
+                if verbose:
+                    print(f"   ⚠️  Error extracting result {i+1}: {e}")
                 continue
+
+        if verbose:
+            print(f"   ✅ Total valid results: {len(results)}")
 
         return results
 
