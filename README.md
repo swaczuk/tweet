@@ -28,8 +28,7 @@ A comprehensive web scraper for extracting AI-generated highlights, URLs, titles
 ## Prerequisites
 
 - Python 3.8 or higher
-- Google Chrome browser
-- ChromeDriver (automatically managed by selenium)
+- No browser installation needed! Playwright will automatically install Chromium
 
 ## Installation
 
@@ -46,9 +45,15 @@ cd tweet
 pip install -r requirements.txt
 ```
 
-### 3. Install ChromeDriver
+### 3. Install Playwright browsers
 
-The scraper uses Selenium with Chrome. ChromeDriver will be managed automatically, but ensure you have Google Chrome installed on your system.
+After installing the dependencies, install Chromium:
+
+```bash
+playwright install chromium
+```
+
+This will automatically download and install Chromium. No need to manage browser drivers!
 
 ## Usage
 
@@ -328,20 +333,33 @@ Google frequently updates its HTML structure. If the scraper stops working:
 
 ## Troubleshooting
 
-### "ChromeDriver not found"
+### "Playwright not available"
 
-Install ChromeDriver or ensure Chrome is installed:
+Install Playwright and Chromium:
 
 ```bash
-pip install webdriver-manager
+pip install playwright
+playwright install chromium
 ```
 
-### "Selenium not available"
+### "Browser executable not found"
 
-Install Selenium:
+If you get an error about missing browser, install Chromium:
 
 ```bash
-pip install selenium
+playwright install chromium
+```
+
+### Chromium not working on Linux
+
+On some Linux systems, you may need additional dependencies:
+
+```bash
+# Debian/Ubuntu
+playwright install-deps chromium
+
+# Or install system dependencies manually
+sudo apt-get install libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 libxdamage1 libgbm1 libpango-1.0-0 libcairo2
 ```
 
 ### No AI Overview extracted

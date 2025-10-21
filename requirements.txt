@@ -1,19 +1,15 @@
 # Google AI Mode Scraper Dependencies
 
-# Web scraping
-selenium>=4.15.0
+# Browser automation with Playwright (replaces Selenium + ChromeDriver)
+playwright>=1.40.0
+
+# Web scraping and HTML parsing
 beautifulsoup4>=4.12.0
-requests>=2.31.0
+lxml>=4.9.0
 
 # Web framework
 flask>=3.0.0
 flask-cors>=4.0.0
-
-# Browser automation
-webdriver-manager>=4.0.0
-
-# Data handling
-lxml>=4.9.0
 
 # Optional: Better HTML parsing
 html5lib>=1.1

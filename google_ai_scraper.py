@@ -2,6 +2,7 @@
 """
 Google AI Mode Scraper
 Extracts AI-generated highlights, URLs, titles, and meta descriptions from Google Search
+Uses Playwright with Chromium for reliable browser automation
 """
 
 import json
@@ -12,28 +13,19 @@ from urllib.parse import quote_plus, urlencode
 from dataclasses import dataclass, asdict
 
 try:
-    from selenium import webdriver
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
-    from webdriver_manager.chrome import ChromeDriverManager
-    SELENIUM_AVAILABLE = True
-    WEBDRIVER_MANAGER_AVAILABLE = True
-except ImportError as e:
-    SELENIUM_AVAILABLE = False
-    WEBDRIVER_MANAGER_AVAILABLE = False
-    print(f"Warning: Selenium/webdriver-manager not available. Install with: pip install selenium webdriver-manager")
-    print(f"Error details: {e}")
+    from playwright.sync_api import sync_playwright, Browser, Page, Playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    print("Warning: Playwright not available. Install with: pip install playwright")
+    print("After installation, run: playwright install chromium")
 
 try:
     from bs4 import BeautifulSoup
-    import requests
-    REQUESTS_AVAILABLE = True
+    BEAUTIFULSOUP_AVAILABLE = True
 except ImportError:
-    REQUESTS_AVAILABLE = False
-    print("Warning: requests/beautifulsoup4 not available. Install with: pip install requests beautifulsoup4")
+    BEAUTIFULSOUP_AVAILABLE = False
+    print("Warning: beautifulsoup4 not available. Install with: pip install beautifulsoup4")
 
 
 @dataclass
@@ -60,7 +52,7 @@ class AIModeScrapeResult:
 
 
 class GoogleAIModeScraper:
-    """Scraper for Google AI Mode (SGE) search results"""
+    """Scraper for Google AI Mode (SGE) search results using Playwright"""
 
     def __init__(self, headless: bool = True):
         """
@@ -69,41 +61,54 @@ class GoogleAIModeScraper:
         Args:
             headless: Run browser in headless mode (no GUI)
         """
+        if not PLAYWRIGHT_AVAILABLE:
+            raise ImportError(
+                "Playwright is required for this scraper.\n"
+                "Install with:\n"
+                "  pip install playwright\n"
+                "  playwright install chromium"
+            )
+
+        if not BEAUTIFULSOUP_AVAILABLE:
+            raise ImportError("BeautifulSoup4 is required. Install with: pip install beautifulsoup4")
+
         self.headless = headless
-        self.driver = None
+        self.playwright = None
+        self.browser = None
+        self.context = None
+        self.page = None
 
-    def _init_driver(self):
-        """Initialize Selenium WebDriver"""
-        if not SELENIUM_AVAILABLE:
-            raise ImportError("Selenium is required for this scraper. Install with: pip install selenium")
+    def _init_browser(self):
+        """Initialize Playwright browser"""
+        if self.playwright is None:
+            self.playwright = sync_playwright().start()
 
-        chrome_options = Options()
-        if self.headless:
-            chrome_options.add_argument('--headless=new')
+            # Launch Chromium browser
+            self.browser = self.playwright.chromium.launch(
+                headless=self.headless,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-blink-features=AutomationControlled'
+                ]
+            )
 
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            # Create browser context with custom user agent
+            self.context = self.browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                viewport={'width': 1920, 'height': 1080}
+            )
 
-        # Add experimental options to avoid detection
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
+            # Create new page
+            self.page = self.context.new_page()
 
-        # Use webdriver-manager to automatically handle ChromeDriver versions
-        try:
-            if WEBDRIVER_MANAGER_AVAILABLE:
-                service = Service(ChromeDriverManager().install())
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            else:
-                # Fallback to using system ChromeDriver
-                self.driver = webdriver.Chrome(options=chrome_options)
-        except Exception as e:
-            print(f"Error initializing ChromeDriver: {e}")
-            print("Tip: Install webdriver-manager with: pip install webdriver-manager")
-            raise
-
-        self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            # Remove webdriver detection
+            self.page.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """)
 
     def _build_google_url(self, query: str, language: str = 'en', region: str = 'US') -> str:
         """
@@ -140,22 +145,22 @@ class GoogleAIModeScraper:
         Returns:
             AIModeScrapeResult with extracted data
         """
-        if self.driver is None:
-            self._init_driver()
+        if self.browser is None:
+            self._init_browser()
 
         result = AIModeScrapeResult(query=query, language=language, region=region)
 
         try:
             # Navigate to Google Search
             url = self._build_google_url(query, language, region)
-            self.driver.get(url)
+            self.page.goto(url, wait_until='networkidle', timeout=30000)
 
-            # Wait for page to load
+            # Wait for page to load completely
             time.sleep(wait_time)
 
-            # Get page source
-            page_source = self.driver.page_source
-            soup = BeautifulSoup(page_source, 'html.parser')
+            # Get page content
+            page_content = self.page.content()
+            soup = BeautifulSoup(page_content, 'html.parser')
 
             # Extract AI Overview/Summary
             result.ai_overview = self._extract_ai_overview(soup)
@@ -165,6 +170,8 @@ class GoogleAIModeScraper:
 
         except Exception as e:
             print(f"Error during scraping: {e}")
+            import traceback
+            traceback.print_exc()
 
         return result
 
@@ -185,7 +192,9 @@ class GoogleAIModeScraper:
             'div[class*="ai-overview"]',
             'div[jsname*="yEVEE"]',
             'div[class*="VwiC3b"]',
-            'div[class*="Wnoohf"]'
+            'div[class*="Wnoohf"]',
+            'div[data-hveid]',  # Common Google container
+            'div.g-blk',  # AI block
         ]
 
         for selector in ai_selectors:
@@ -195,7 +204,7 @@ class GoogleAIModeScraper:
                 text_parts = []
                 for elem in elements:
                     text = elem.get_text(strip=True, separator=' ')
-                    if text:
+                    if text and len(text) > 50:  # Filter out very short snippets
                         text_parts.append(text)
 
                 if text_parts:
@@ -217,7 +226,7 @@ class GoogleAIModeScraper:
 
         # Find all search result divs
         # Google uses various class names, these are common ones
-        result_divs = soup.select('div.g, div[data-sokoban-container], div.Gx5Zad')
+        result_divs = soup.select('div.g, div[data-sokoban-container], div.Gx5Zad, div.MjjYud')
 
         for div in result_divs:
             try:
@@ -238,17 +247,17 @@ class GoogleAIModeScraper:
                         url = unquote(match.group(1))
 
                 # Extract meta description
-                desc_elem = div.select_one('div[data-sncf], div.VwiC3b, div[style*="-webkit-line-clamp"]')
+                desc_elem = div.select_one('div[data-sncf], div.VwiC3b, div[style*="-webkit-line-clamp"], span.aCOpRe')
                 meta_description = desc_elem.get_text(strip=True) if desc_elem else ''
 
                 # Extract AI highlight (if present)
                 ai_highlight = None
-                highlight_elem = div.select_one('span[style*="background"], mark, em.highlighted')
+                highlight_elem = div.select_one('span[style*="background"], mark, em.highlighted, b, strong')
                 if highlight_elem:
                     ai_highlight = highlight_elem.get_text(strip=True)
 
                 # Only add if we have at least a title and URL
-                if title and url:
+                if title and url and url.startswith('http'):
                     results.append(SearchResult(
                         url=url,
                         title=title,
@@ -286,10 +295,22 @@ class GoogleAIModeScraper:
         return results
 
     def close(self):
-        """Close the browser"""
-        if self.driver:
-            self.driver.quit()
-            self.driver = None
+        """Close the browser and cleanup"""
+        if self.page:
+            self.page.close()
+            self.page = None
+
+        if self.context:
+            self.context.close()
+            self.context = None
+
+        if self.browser:
+            self.browser.close()
+            self.browser = None
+
+        if self.playwright:
+            self.playwright.stop()
+            self.playwright = None
 
     def __enter__(self):
         """Context manager entry"""
