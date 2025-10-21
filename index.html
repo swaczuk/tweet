@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google AI Mode Scraper</title>
+    <link rel="stylesheet" href="styles/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Google AI Mode Scraper</h1>
+            <p>Extract AI-generated highlights and SERP data from Google</p>
+        </header>
+
+        <div class="search-form">
+            <div class="form-group">
+                <label for="query">Search Query:</label>
+                <input
+                    type="text"
+                    id="query"
+                    placeholder="Enter your search query..."
+                    required
+                >
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="language">Language:</label>
+                    <select id="language">
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="zh-CN">Chinese (Simplified)</option>
+                        <option value="zh-TW">Chinese (Traditional)</option>
+                        <option value="ar">Arabic</option>
+                        <option value="ru">Russian</option>
+                        <option value="nl">Dutch</option>
+                        <option value="sv">Swedish</option>
+                        <option value="pl">Polish</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="region">Region:</label>
+                    <select id="region">
+                        <option value="US">United States</option>
+                        <option value="GB">United Kingdom</option>
+                        <option value="CA">Canada</option>
+                        <option value="AU">Australia</option>
+                        <option value="ES">Spain</option>
+                        <option value="FR">France</option>
+                        <option value="DE">Germany</option>
+                        <option value="IT">Italy</option>
+                        <option value="JP">Japan</option>
+                        <option value="KR">South Korea</option>
+                        <option value="CN">China</option>
+                        <option value="IN">India</option>
+                        <option value="BR">Brazil</option>
+                        <option value="MX">Mexico</option>
+                        <option value="NL">Netherlands</option>
+                        <option value="SE">Sweden</option>
+                        <option value="PL">Poland</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="scrapeBtn" class="btn-primary">Scrape Results</button>
+            <button id="exportBtn" class="btn-secondary" style="display: none;">Export as JSON</button>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Scraping Google AI Mode...</p>
+        </div>
+
+        <div id="results" class="results" style="display: none;">
+            <h2>Results</h2>
+
+            <div class="metadata">
+                <span class="badge">Query: <strong id="resultQuery"></strong></span>
+                <span class="badge">Language: <strong id="resultLanguage"></strong></span>
+                <span class="badge">Region: <strong id="resultRegion"></strong></span>
+            </div>
+
+            <div id="aiOverview" class="ai-overview" style="display: none;">
+                <h3>AI Overview</h3>
+                <div class="ai-content"></div>
+            </div>
+
+            <div id="searchResults" class="search-results">
+                <h3>Search Results</h3>
+                <div id="resultsList"></div>
+            </div>
+        </div>
+
+        <div id="error" class="error" style="display: none;">
+            <h3>Error</h3>
+            <p id="errorMessage"></p>
+        </div>
+    </div>
+
+    <script>
+        let currentResults = null;
+
+        document.getElementById('scrapeBtn').addEventListener('click', async () => {
+            const query = document.getElementById('query').value.trim();
+            const language = document.getElementById('language').value;
+            const region = document.getElementById('region').value;
+
+            if (!query) {
+                showError('Please enter a search query');
+                return;
+            }
+
+            // Show loading, hide results/error
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('exportBtn').style.display = 'none';
+
+            try {
+                // Call backend API
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query, language, region })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                currentResults = data;
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+
+                // For demo purposes, show sample data if API is not available
+                showError('API not available. Showing sample data structure below.');
+                displaySampleResults(query, language, region);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (!currentResults) return;
+
+            const dataStr = JSON.stringify(currentResults, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+            const exportFileDefaultName = `google-ai-scrape-${Date.now()}.json`;
+
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        });
+
+        function displayResults(data) {
+            // Display metadata
+            document.getElementById('resultQuery').textContent = data.query;
+            document.getElementById('resultLanguage').textContent = data.language;
+            document.getElementById('resultRegion').textContent = data.region;
+
+            // Display AI Overview if available
+            const aiOverviewDiv = document.getElementById('aiOverview');
+            if (data.ai_overview) {
+                aiOverviewDiv.style.display = 'block';
+                aiOverviewDiv.querySelector('.ai-content').textContent = data.ai_overview;
+            } else {
+                aiOverviewDiv.style.display = 'none';
+            }
+
+            // Display search results
+            const resultsList = document.getElementById('resultsList');
+            resultsList.innerHTML = '';
+
+            if (data.results && data.results.length > 0) {
+                data.results.forEach((result, index) => {
+                    const resultCard = createResultCard(result, index + 1);
+                    resultsList.appendChild(resultCard);
+                });
+            } else {
+                resultsList.innerHTML = '<p class="no-results">No results found</p>';
+            }
+
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('exportBtn').style.display = 'inline-block';
+        }
+
+        function createResultCard(result, index) {
+            const card = document.createElement('div');
+            card.className = 'result-card';
+
+            card.innerHTML = `
+                <div class="result-header">
+                    <span class="result-number">#${index}</span>
+                    <h4 class="result-title">${escapeHtml(result.title)}</h4>
+                </div>
+                <a href="${escapeHtml(result.url)}" target="_blank" class="result-url">${escapeHtml(result.url)}</a>
+                ${result.meta_description ? `
+                    <p class="result-description">${escapeHtml(result.meta_description)}</p>
+                ` : ''}
+                ${result.ai_highlight ? `
+                    <div class="ai-highlight">
+                        <strong>AI Highlight:</strong> ${escapeHtml(result.ai_highlight)}
+                    </div>
+                ` : ''}
+            `;
+
+            return card;
+        }
+
+        function displaySampleResults(query, language, region) {
+            const sampleData = {
+                query: query,
+                language: language,
+                region: region,
+                ai_overview: "This is a sample AI-generated overview. The actual implementation would fetch real data from Google AI Mode.",
+                results: [
+                    {
+                        url: "https://example.com/page1",
+                        title: "Sample Result 1",
+                        meta_description: "This is a sample meta description for the first result.",
+                        ai_highlight: "Important information highlighted by AI"
+                    },
+                    {
+                        url: "https://example.com/page2",
+                        title: "Sample Result 2",
+                        meta_description: "This is a sample meta description for the second result.",
+                        ai_highlight: null
+                    },
+                    {
+                        url: "https://example.com/page3",
+                        title: "Sample Result 3",
+                        meta_description: "This is a sample meta description for the third result.",
+                        ai_highlight: "Another highlighted snippet"
+                    }
+                ]
+            };
+
+            currentResults = sampleData;
+            displayResults(sampleData);
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Allow Enter key to trigger search
+        document.getElementById('query').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('scrapeBtn').click();
+            }
+        });
+    </script>
+</body>
+</html>
