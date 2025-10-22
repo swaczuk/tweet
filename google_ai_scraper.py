@@ -299,21 +299,53 @@ class GoogleAIModeScraper:
         """
         results = []
 
-        # Find all search result divs
-        # Google uses various class names, these are common ones
-        result_divs = soup.select('div.g, div[data-sokoban-container], div.Gx5Zad, div.MjjYud')
+        # Try different selectors for Google AI Mode and regular search
+        # Google AI Mode (udm=50) may use different structure
+        result_selectors = [
+            'div.g',                     # Standard Google result
+            'div[data-sokoban-container]',
+            'div.Gx5Zad',
+            'div.MjjYud',
+            'div[jscontroller][jsaction]',  # AI Mode might use these
+            'div[data-hveid] > div > div',  # Nested structure
+        ]
+
+        result_divs = []
+        for selector in result_selectors:
+            divs = soup.select(selector)
+            if verbose and divs:
+                print(f"   Trying selector '{selector}': found {len(divs)} elements")
+            result_divs.extend(divs)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_divs = []
+        for div in result_divs:
+            div_id = id(div)
+            if div_id not in seen:
+                seen.add(div_id)
+                unique_divs.append(div)
 
         if verbose:
-            print(f"   Found {len(result_divs)} potential result containers")
+            print(f"   Total unique result containers: {len(unique_divs)}")
 
-        for i, div in enumerate(result_divs):
+        for i, div in enumerate(unique_divs):
             try:
-                # Extract title
+                # Extract title - must have h3
                 title_elem = div.select_one('h3')
-                title = title_elem.get_text(strip=True) if title_elem else ''
+                if not title_elem:
+                    if verbose:
+                        print(f"   ✗ Div {i+1}: No h3 title found, skipping")
+                    continue
 
-                # Extract URL
-                link_elem = div.select_one('a')
+                title = title_elem.get_text(strip=True)
+                if not title or len(title) < 3:
+                    if verbose:
+                        print(f"   ✗ Div {i+1}: Title too short, skipping")
+                    continue
+
+                # Extract URL - must have valid link
+                link_elem = div.select_one('a[href]')
                 url = link_elem.get('href', '') if link_elem else ''
 
                 # Clean URL if it's a Google redirect
@@ -324,15 +356,28 @@ class GoogleAIModeScraper:
                         from urllib.parse import unquote
                         url = unquote(match.group(1))
 
+                # Skip if not a valid http/https URL
+                if not url or not url.startswith('http'):
+                    if verbose:
+                        print(f"   ✗ Div {i+1}: '{title[:30]}' - Invalid URL: {url[:50]}")
+                    continue
+
+                # Skip Google's own links
+                if any(domain in url for domain in ['google.com/search', 'google.com/url', 'accounts.google.com']):
+                    if verbose:
+                        print(f"   ✗ Div {i+1}: Skipping Google internal link")
+                    continue
+
                 # Extract meta description
-                # Look for the description/snippet container
                 desc_selectors = [
                     'div[data-sncf]',
                     'div.VwiC3b',
                     'div[style*="-webkit-line-clamp"]',
                     'span.aCOpRe',
                     'div.IsZvec',
-                    'div[data-content-feature="1"]'
+                    'div[data-content-feature="1"]',
+                    'div.kb0PBd',  # AI Mode specific
+                    'div.ITZIwc',  # AI Mode specific
                 ]
 
                 meta_description = ''
@@ -340,58 +385,55 @@ class GoogleAIModeScraper:
                 for selector in desc_selectors:
                     desc_container = div.select_one(selector)
                     if desc_container:
-                        # Get all text from description, preserving structure
                         meta_description = desc_container.get_text(strip=True, separator=' ')
-                        break
+                        if len(meta_description) > 20:  # Valid description
+                            break
 
                 # Extract AI highlights (text that Google emphasized)
-                # Look for highlighted text within this specific result's description
                 ai_highlights = []
                 if desc_container:
                     # Find all highlighted/emphasized elements within the description
                     highlight_selectors = [
-                        'em',           # Common emphasis tag
-                        'b',            # Bold text
-                        'strong',       # Strong emphasis
-                        'mark',         # Marked/highlighted text
-                        'span[style*="font-weight"]',  # Bold via style
+                        'em',
+                        'b',
+                        'strong',
+                        'mark',
+                        'span[style*="font-weight"]',
                     ]
 
                     for selector in highlight_selectors:
                         highlights = desc_container.select(selector)
                         for highlight in highlights:
                             highlighted_text = highlight.get_text(strip=True)
-                            # Only add if it's substantial (not just punctuation)
-                            if highlighted_text and len(highlighted_text) > 2:
+                            # Only add if it's substantial and not a duplicate
+                            if highlighted_text and len(highlighted_text) > 2 and highlighted_text not in ai_highlights:
                                 ai_highlights.append(highlighted_text)
 
                 # Join all highlights with separator
-                ai_highlight = ' | '.join(ai_highlights) if ai_highlights else None
+                ai_highlight = ' | '.join(ai_highlights) if ai_highlights else ""
 
-                # Only add if we have at least a title and URL
-                if title and url and url.startswith('http'):
-                    result = SearchResult(
-                        url=url,
-                        title=title,
-                        meta_description=meta_description,
-                        ai_highlight=ai_highlight
-                    )
-                    results.append(result)
+                # Add valid result
+                result = SearchResult(
+                    url=url,
+                    title=title,
+                    meta_description=meta_description,
+                    ai_highlight=ai_highlight
+                )
+                results.append(result)
 
-                    if verbose:
-                        print(f"   ✓ Result {len(results)}: {title[:50]}...")
-                        if ai_highlight:
-                            print(f"      Highlights: {ai_highlight[:100]}...")
-                elif verbose:
-                    print(f"   ✗ Skipped div {i+1}: title='{title[:30] if title else 'none'}', url='{url[:50] if url else 'none'}'")
+                if verbose:
+                    print(f"   ✓ Result {len(results)}: {title[:50]}...")
+                    print(f"      URL: {url[:70]}...")
+                    if ai_highlight:
+                        print(f"      Highlights: {ai_highlight[:80]}...")
 
             except Exception as e:
                 if verbose:
-                    print(f"   ⚠️  Error extracting result {i+1}: {e}")
+                    print(f"   ⚠️  Error extracting div {i+1}: {e}")
                 continue
 
         if verbose:
-            print(f"   ✅ Total valid results: {len(results)}")
+            print(f"   ✅ Total valid results extracted: {len(results)}")
 
         return results
 
