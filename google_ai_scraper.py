@@ -123,10 +123,11 @@ class GoogleAIModeScraper:
             Complete Google Search URL
         """
         params = {
+            'udm': '50',     # AI Mode parameter - Google AI Overview
+            'aep': '11',     # Additional AI parameter
             'q': query,
             'hl': language,  # Interface language
             'gl': region,    # Geographic location
-            'udm': '14',     # AI Mode parameter (may change)
         }
 
         base_url = 'https://www.google.com/search'
