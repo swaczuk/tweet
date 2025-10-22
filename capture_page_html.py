@@ -15,6 +15,9 @@ def capture_html():
     print("Browser will open - solve CAPTCHA if needed\n")
 
     with GoogleAIModeScraper(headless=False) as scraper:
+        # Initialize the browser
+        scraper._init_browser()
+
         # Navigate to the page
         url = scraper._build_google_url(query, language="en", region="US")
         print(f"🔗 URL: {url}\n")
