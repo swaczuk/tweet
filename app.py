@@ -77,8 +77,8 @@ def scrape():
             wait_time=wait_time
         )
 
-        # Convert to dict and return
-        return jsonify(asdict(result))
+        # Convert to structured dict and return
+        return jsonify(result.to_structured_dict())
 
     except Exception as e:
         return jsonify({
@@ -123,8 +123,8 @@ def scrape_batch():
             region=region
         )
 
-        # Convert to dict and return
-        return jsonify([asdict(r) for r in results])
+        # Convert to structured dict and return
+        return jsonify([r.to_structured_dict() for r in results])
 
     except Exception as e:
         return jsonify({

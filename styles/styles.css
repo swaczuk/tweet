@@ -286,10 +286,25 @@ header p {
     text-decoration: underline;
 }
 
+.result-section {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #fafafa;
+    border-radius: 4px;
+}
+
+.section-label {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.875rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
 .result-description {
     color: var(--text-secondary);
     line-height: 1.6;
-    margin-bottom: 0.75rem;
+    margin: 0;
 }
 
 .ai-highlight {
@@ -298,13 +313,17 @@ header p {
     padding: 0.75rem 1rem;
     border-radius: 4px;
     margin-top: 1rem;
-    font-size: 0.9rem;
 }
 
-.ai-highlight strong {
+.ai-highlight .section-label {
     color: var(--secondary-color);
+    margin-bottom: 0.5rem;
+}
+
+.highlight-content {
+    color: var(--text-primary);
+    line-height: 1.6;
     display: block;
-    margin-bottom: 0.25rem;
 }
 
 .no-results {

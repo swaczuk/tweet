@@ -168,27 +168,27 @@
         });
 
         function displayResults(data) {
-            // Display metadata
-            document.getElementById('resultQuery').textContent = data.query;
-            document.getElementById('resultLanguage').textContent = data.language;
-            document.getElementById('resultRegion').textContent = data.region;
+            // Display metadata from new structure
+            document.getElementById('resultQuery').textContent = data.search_info.query;
+            document.getElementById('resultLanguage').textContent = data.search_info.language;
+            document.getElementById('resultRegion').textContent = data.search_info.region;
 
             // Display AI Overview if available
             const aiOverviewDiv = document.getElementById('aiOverview');
-            if (data.ai_overview) {
+            if (data.ai_overview && data.ai_overview.trim()) {
                 aiOverviewDiv.style.display = 'block';
                 aiOverviewDiv.querySelector('.ai-content').textContent = data.ai_overview;
             } else {
                 aiOverviewDiv.style.display = 'none';
             }
 
-            // Display search results
+            // Display search results from 'urls' array
             const resultsList = document.getElementById('resultsList');
             resultsList.innerHTML = '';
 
-            if (data.results && data.results.length > 0) {
-                data.results.forEach((result, index) => {
-                    const resultCard = createResultCard(result, index + 1);
+            if (data.urls && data.urls.length > 0) {
+                data.urls.forEach((url_data) => {
+                    const resultCard = createResultCard(url_data);
                     resultsList.appendChild(resultCard);
                 });
             } else {
@@ -199,22 +199,26 @@
             document.getElementById('exportBtn').style.display = 'inline-block';
         }
 
-        function createResultCard(result, index) {
+        function createResultCard(url_data) {
             const card = document.createElement('div');
             card.className = 'result-card';
 
             card.innerHTML = `
                 <div class="result-header">
-                    <span class="result-number">#${index}</span>
-                    <h4 class="result-title">${escapeHtml(result.title)}</h4>
+                    <span class="result-number">#${url_data.position}</span>
+                    <h4 class="result-title">${escapeHtml(url_data.title)}</h4>
                 </div>
-                <a href="${escapeHtml(result.url)}" target="_blank" class="result-url">${escapeHtml(result.url)}</a>
-                ${result.meta_description ? `
-                    <p class="result-description">${escapeHtml(result.meta_description)}</p>
+                <a href="${escapeHtml(url_data.url)}" target="_blank" class="result-url">${escapeHtml(url_data.url)}</a>
+                ${url_data.meta_description && url_data.meta_description.trim() ? `
+                    <div class="result-section">
+                        <strong class="section-label">Description:</strong>
+                        <p class="result-description">${escapeHtml(url_data.meta_description)}</p>
+                    </div>
                 ` : ''}
-                ${result.ai_highlight ? `
+                ${url_data.highlighted_text && url_data.highlighted_text.trim() ? `
                     <div class="ai-highlight">
-                        <strong>AI Highlight:</strong> ${escapeHtml(result.ai_highlight)}
+                        <strong class="section-label">Highlighted Text:</strong>
+                        <span class="highlight-content">${escapeHtml(url_data.highlighted_text)}</span>
                     </div>
                 ` : ''}
             `;
@@ -224,28 +228,34 @@
 
         function displaySampleResults(query, language, region) {
             const sampleData = {
-                query: query,
-                language: language,
-                region: region,
+                search_info: {
+                    query: query,
+                    language: language,
+                    region: region,
+                    total_results: 3
+                },
                 ai_overview: "This is a sample AI-generated overview. The actual implementation would fetch real data from Google AI Mode.",
-                results: [
+                urls: [
                     {
+                        position: 1,
                         url: "https://example.com/page1",
                         title: "Sample Result 1",
                         meta_description: "This is a sample meta description for the first result.",
-                        ai_highlight: "Important information highlighted by AI"
+                        highlighted_text: "Important information | highlighted by AI"
                     },
                     {
+                        position: 2,
                         url: "https://example.com/page2",
                         title: "Sample Result 2",
                         meta_description: "This is a sample meta description for the second result.",
-                        ai_highlight: null
+                        highlighted_text: ""
                     },
                     {
+                        position: 3,
                         url: "https://example.com/page3",
                         title: "Sample Result 3",
                         meta_description: "This is a sample meta description for the third result.",
-                        ai_highlight: "Another highlighted snippet"
+                        highlighted_text: "Another highlighted snippet | more text"
                     }
                 ]
             };

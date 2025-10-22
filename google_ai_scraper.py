@@ -50,6 +50,34 @@ class AIModeScrapeResult:
         if self.results is None:
             self.results = []
 
+    def to_structured_dict(self) -> Dict:
+        """
+        Convert to a clean, well-structured dictionary for JSON output
+        Each URL is clearly separated with all its associated data
+        """
+        urls_data = []
+
+        for idx, result in enumerate(self.results, 1):
+            url_entry = {
+                "position": idx,
+                "url": result.url,
+                "title": result.title,
+                "meta_description": result.meta_description if result.meta_description else "",
+                "highlighted_text": result.ai_highlight if result.ai_highlight else ""
+            }
+            urls_data.append(url_entry)
+
+        return {
+            "search_info": {
+                "query": self.query,
+                "language": self.language,
+                "region": self.region,
+                "total_results": len(self.results)
+            },
+            "ai_overview": self.ai_overview if self.ai_overview else "",
+            "urls": urls_data
+        }
+
 
 class GoogleAIModeScraper:
     """Scraper for Google AI Mode (SGE) search results using Playwright"""
