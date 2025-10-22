@@ -5,24 +5,14 @@ Flask API server for Google AI Mode Scraper
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from google_ai_scraper import GoogleAIModeScraper, AIModeScrapeResult
-from dataclasses import asdict
+from google_ai_scraper import GoogleAIModeScraper
 import os
 
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Initialize scraper (shared instance)
-scraper = None
+# Global config
 DEBUG_MODE = False  # Set to True to show browser window
-
-
-def get_scraper():
-    """Get or create scraper instance"""
-    global scraper
-    if scraper is None:
-        scraper = GoogleAIModeScraper(headless=not DEBUG_MODE)
-    return scraper
 
 
 @app.route('/')
@@ -68,14 +58,14 @@ def scrape():
                 'error': 'Query cannot be empty'
             }), 400
 
-        # Perform scraping
-        scraper_instance = get_scraper()
-        result = scraper_instance.scrape(
-            query=query,
-            language=language,
-            region=region,
-            wait_time=wait_time
-        )
+        # Perform scraping with new instance (avoid threading issues)
+        with GoogleAIModeScraper(headless=not DEBUG_MODE) as scraper:
+            result = scraper.scrape(
+                query=query,
+                language=language,
+                region=region,
+                wait_time=wait_time
+            )
 
         # Convert to structured dict and return
         return jsonify(result.to_structured_dict())
@@ -115,13 +105,13 @@ def scrape_batch():
                 'error': 'Queries must be a non-empty list'
             }), 400
 
-        # Perform batch scraping
-        scraper_instance = get_scraper()
-        results = scraper_instance.scrape_batch(
-            queries=queries,
-            language=language,
-            region=region
-        )
+        # Perform batch scraping with new instance (avoid threading issues)
+        with GoogleAIModeScraper(headless=not DEBUG_MODE) as scraper:
+            results = scraper.scrape_batch(
+                queries=queries,
+                language=language,
+                region=region
+            )
 
         # Convert to structured dict and return
         return jsonify([r.to_structured_dict() for r in results])
@@ -137,17 +127,8 @@ def health():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'selenium_available': 'selenium' in globals()
+        'playwright_available': True
     })
-
-
-@app.teardown_appcontext
-def cleanup(error=None):
-    """Cleanup scraper on app shutdown"""
-    global scraper
-    if scraper:
-        scraper.close()
-        scraper = None
 
 
 if __name__ == '__main__':
