@@ -11,8 +11,9 @@ import os
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Global config
-DEBUG_MODE = False  # Set to True to show browser window
+# Global config - Browser visible by default to handle CAPTCHAs
+# Google almost always shows CAPTCHA, so visible browser is needed
+SHOW_BROWSER = True  # Set to False for headless mode
 
 
 @app.route('/')
@@ -59,12 +60,14 @@ def scrape():
             }), 400
 
         # Perform scraping with new instance (avoid threading issues)
-        with GoogleAIModeScraper(headless=not DEBUG_MODE) as scraper:
+        # Browser visible by default to handle CAPTCHAs
+        with GoogleAIModeScraper(headless=not SHOW_BROWSER) as scraper:
             result = scraper.scrape(
                 query=query,
                 language=language,
                 region=region,
-                wait_time=wait_time
+                wait_time=wait_time,
+                wait_for_user=SHOW_BROWSER  # Pause for CAPTCHA if browser is visible
             )
 
         # Convert to structured dict and return
@@ -106,7 +109,7 @@ def scrape_batch():
             }), 400
 
         # Perform batch scraping with new instance (avoid threading issues)
-        with GoogleAIModeScraper(headless=not DEBUG_MODE) as scraper:
+        with GoogleAIModeScraper(headless=not SHOW_BROWSER) as scraper:
             results = scraper.scrape_batch(
                 queries=queries,
                 language=language,
@@ -138,16 +141,20 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', type=int, default=5000, help='Port to run server on')
     parser.add_argument('-H', '--host', default='127.0.0.1', help='Host to bind to')
     parser.add_argument('-d', '--debug', action='store_true', help='Run in debug mode')
-    parser.add_argument('--show-browser', action='store_true', help='Show browser window (for debugging)')
+    parser.add_argument('--headless', action='store_true',
+                       help='Run browser in headless mode (invisible). Not recommended - CAPTCHAs cannot be solved.')
 
     args = parser.parse_args()
 
-    # Set debug mode if --show-browser is enabled
-    DEBUG_MODE = args.show_browser
+    # Browser is visible by default, unless --headless is specified
+    SHOW_BROWSER = not args.headless
 
     print(f"Starting Google AI Mode Scraper API on {args.host}:{args.port}")
-    if DEBUG_MODE:
-        print("⚠️  DEBUG MODE: Browser window will be VISIBLE")
+    print(f"Browser mode: {'HEADLESS (invisible)' if args.headless else 'VISIBLE'}")
+    if not args.headless:
+        print("ℹ️  Browser will open automatically for CAPTCHA solving")
+        print("   The terminal will pause - solve CAPTCHA and press ENTER to continue")
     print(f"Open http://{args.host}:{args.port} in your browser")
+    print()
 
     app.run(host=args.host, port=args.port, debug=args.debug)
