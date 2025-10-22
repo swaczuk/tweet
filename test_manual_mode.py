@@ -66,12 +66,14 @@ def manual_test():
         if result.results:
             for i, res in enumerate(result.results, 1):
                 print(f"\n{i}. {res.title}")
-                print(f"   URL: {res.url[:80]}...")
+                print(f"   URL: {res.url}")
                 if res.meta_description:
-                    desc = res.meta_description[:150]
-                    print(f"   Description: {desc}...")
+                    desc = res.meta_description[:200]
+                    print(f"   Meta Description: {desc}{'...' if len(res.meta_description) > 200 else ''}")
                 if res.ai_highlight:
-                    print(f"   ✨ AI Highlight: {res.ai_highlight}")
+                    print(f"   ✨ Highlighted Text: {res.ai_highlight}")
+                else:
+                    print(f"   ✨ Highlighted Text: (none)")
         else:
             print("\n⚠️  No search results found")
             print("\nPossible reasons:")

@@ -297,25 +297,63 @@ class GoogleAIModeScraper:
                         url = unquote(match.group(1))
 
                 # Extract meta description
-                desc_elem = div.select_one('div[data-sncf], div.VwiC3b, div[style*="-webkit-line-clamp"], span.aCOpRe')
-                meta_description = desc_elem.get_text(strip=True) if desc_elem else ''
+                # Look for the description/snippet container
+                desc_selectors = [
+                    'div[data-sncf]',
+                    'div.VwiC3b',
+                    'div[style*="-webkit-line-clamp"]',
+                    'span.aCOpRe',
+                    'div.IsZvec',
+                    'div[data-content-feature="1"]'
+                ]
 
-                # Extract AI highlight (if present)
-                ai_highlight = None
-                highlight_elem = div.select_one('span[style*="background"], mark, em.highlighted, b, strong')
-                if highlight_elem:
-                    ai_highlight = highlight_elem.get_text(strip=True)
+                meta_description = ''
+                desc_container = None
+                for selector in desc_selectors:
+                    desc_container = div.select_one(selector)
+                    if desc_container:
+                        # Get all text from description, preserving structure
+                        meta_description = desc_container.get_text(strip=True, separator=' ')
+                        break
+
+                # Extract AI highlights (text that Google emphasized)
+                # Look for highlighted text within this specific result's description
+                ai_highlights = []
+                if desc_container:
+                    # Find all highlighted/emphasized elements within the description
+                    highlight_selectors = [
+                        'em',           # Common emphasis tag
+                        'b',            # Bold text
+                        'strong',       # Strong emphasis
+                        'mark',         # Marked/highlighted text
+                        'span[style*="font-weight"]',  # Bold via style
+                    ]
+
+                    for selector in highlight_selectors:
+                        highlights = desc_container.select(selector)
+                        for highlight in highlights:
+                            highlighted_text = highlight.get_text(strip=True)
+                            # Only add if it's substantial (not just punctuation)
+                            if highlighted_text and len(highlighted_text) > 2:
+                                ai_highlights.append(highlighted_text)
+
+                # Join all highlights with separator
+                ai_highlight = ' | '.join(ai_highlights) if ai_highlights else None
 
                 # Only add if we have at least a title and URL
                 if title and url and url.startswith('http'):
-                    results.append(SearchResult(
+                    result = SearchResult(
                         url=url,
                         title=title,
                         meta_description=meta_description,
                         ai_highlight=ai_highlight
-                    ))
+                    )
+                    results.append(result)
+
                     if verbose:
                         print(f"   ✓ Result {len(results)}: {title[:50]}...")
+                        if ai_highlight:
+                            print(f"      Highlights: {ai_highlight[:100]}...")
                 elif verbose:
                     print(f"   ✗ Skipped div {i+1}: title='{title[:30] if title else 'none'}', url='{url[:50] if url else 'none'}'")
 
