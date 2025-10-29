@@ -29,15 +29,23 @@ class LogEntry:
 class LogParser:
     """Parser para archivos de log de servidor"""
 
-    # Expresión regular para el formato de log personalizado
-    # Formato: IP - - DD/MM/YYYY HH:MM:SS AM/PM "METHOD URL HTTP/1.1" status num1 num2 "" "user-agent"
-    # Ejemplo: 10.201.52.5 - - 25/09/2025 08:05:31 PM "GET https://www.ajg.com/uk/... HTTP/1.1" 200 100 100  "" "Mozilla/5.0..."
+    # Expresión regular para el formato de log personalizado (MUY FLEXIBLE)
+    # Formato base: IP - - DD/MM/YYYY HH:MM:SS AM/PM "METHOD URL HTTP/1.1" status [campos opcionales]
+    # Captura variaciones:
+    # - Con user agent: ...status 100 100 "" "user-agent"
+    # - Sin user agent: ...status 100 100 "" ""
+    # - Campos faltantes: ...status 100
+    # - User agent sin comillas: ...status 100 100 "" user-agent
     LOG_PATTERN = re.compile(
-        r'(?P<ip>[\d\.]+) - - '
-        r'(?P<timestamp>\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2} (?:AM|PM)) '
-        r'"(?P<method>\w+) (?P<url>\S+) HTTP/[^"]+" '
-        r'(?P<status>\d+) (?P<size1>\d+) (?P<size2>\d+)\s+'
-        r'"[^"]*" "(?P<user_agent>[^"]*)"'
+        r'(?P<ip>[\d\.]+)\s+-\s+-\s+'  # IP con espacios flexibles
+        r'(?P<timestamp>\d{2}/\d{2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s+(?:AM|PM))\s+'  # Timestamp flexible
+        r'"(?P<method>\w+)\s+(?P<url>\S+)\s+HTTP/[^"]+"\s+'  # Método y URL
+        r'(?P<status>\d+)'  # Status code (requerido)
+        r'(?:\s+\d+)?'  # Size1 opcional (lo ignoramos)
+        r'(?:\s+\d+)?'  # Size2 opcional (lo ignoramos)
+        r'(?:\s+"[^"]*")?'  # Referer opcional (lo ignoramos)
+        r'(?:\s+"(?P<user_agent>[^"]*)")?'  # User agent opcional entre comillas
+        r'(?:\s+(?P<user_agent_noq>\S.*))?'  # User agent sin comillas (alternativa)
     )
 
     # Lista de bots conocidos con patrones para detectarlos en User-Agent
@@ -86,6 +94,9 @@ class LogParser:
         'Sitebulb': r'sitebulb',
         'ImagesiftBot': r'ImagesiftBot',
         'PingdomBot': r'Pingdom\.com_bot',
+        'IncapsulaBot': r'Incapsula',  # Incapsula CDN bot
+        'UptimeBot': r'(?:Uptime|UptimeRobot)',  # Uptime monitoring
+        'HardenInsightBot': r'hardeninsight',  # Security scanning
     }
 
     # Configuración de regiones basadas en URL
@@ -193,9 +204,15 @@ class LogParser:
             return None
 
         data = match.groupdict()
-        user_agent = data['user_agent']
         url = data['url']
         timestamp = data['timestamp']
+
+        # User agent puede estar en 'user_agent' (con comillas) o 'user_agent_noq' (sin comillas)
+        user_agent = data.get('user_agent') or data.get('user_agent_noq') or ''
+
+        # Si no hay user agent, ignorar la línea
+        if not user_agent or user_agent.strip() == '':
+            return None
 
         bot_name = self.identify_bot(user_agent)
         if not bot_name:
