@@ -41,31 +41,38 @@ class LogParser:
     )
 
     # Lista de bots conocidos con patrones para detectarlos en User-Agent
+    # Los bots están ordenados por prioridad (los más específicos primero)
     BOT_PATTERNS = {
+        # Bots de IA - Consolidados por proveedor
+        'ChatGPT': r'(?:GPTBot|ChatGPT-User|Google-Extended)',  # Todos los bots de OpenAI/ChatGPT
+        'Claude': r'(?:ClaudeBot|Claude-Web|anthropic-ai)',  # Todos los bots de Anthropic/Claude
+        'Gemini': r'(?:Google-Extended|Gemini)',  # Bots de Google Gemini
+        'PerplexityBot': r'PerplexityBot',
+
+        # Motores de búsqueda
         'Googlebot': r'Googlebot',
-        'Google-Extended': r'Google-Extended',  # ChatGPT en Google
-        'GPTBot': r'GPTBot',  # OpenAI ChatGPT
-        'ChatGPT-User': r'ChatGPT-User',
-        'Claude-Web': r'Claude-Web',  # Anthropic Claude
-        'ClaudeBot': r'ClaudeBot',
-        'anthropic-ai': r'anthropic-ai',
-        'Google-InspectionTool': r'Google-InspectionTool',
         'Bingbot': r'bingbot',
-        'Slurp': r'Yahoo! Slurp',  # Yahoo
+        'YahooBot': r'Yahoo! Slurp',
         'DuckDuckBot': r'DuckDuckBot',
         'Baiduspider': r'Baiduspider',
         'YandexBot': r'YandexBot',
-        'PerplexityBot': r'PerplexityBot',
         'Applebot': r'Applebot',
-        'facebookexternalhit': r'facebookexternalhit',
+
+        # Herramientas de Google
+        'Google-InspectionTool': r'Google-InspectionTool',
+        'Google-Safety': r'Google-Safety',
+
+        # Redes sociales
+        'FacebookBot': r'facebookexternalhit',
         'LinkedInBot': r'LinkedInBot',
-        'Twitterbot': r'Twitterbot',
-        'Slackbot': r'Slackbot',
-        'Discordbot': r'Discordbot',
+        'TwitterBot': r'Twitterbot',
+        'SlackBot': r'Slackbot',
+        'DiscordBot': r'Discordbot',
         'TelegramBot': r'TelegramBot',
-        'WhatsApp': r'WhatsApp',
-        'ia_archiver': r'ia_archiver',  # Internet Archive
-        'archive.org_bot': r'archive\.org_bot',
+        'WhatsAppBot': r'WhatsApp',
+
+        # Otros crawlers
+        'InternetArchive': r'(?:ia_archiver|archive\.org_bot)',
         'PetalBot': r'PetalBot',
         'Bytespider': r'Bytespider',
         'SemrushBot': r'SemrushBot',
@@ -74,11 +81,11 @@ class LogParser:
         'MJ12bot': r'MJ12bot',
         'BLEXBot': r'BLEXBot',
         'DataForSeoBot': r'DataForSeoBot',
-        'rogerbot': r'rogerbot',
-        'Screaming Frog': r'Screaming Frog',
-        'sitebulb': r'sitebulb',
-        'Google-Safety': r'Google-Safety',
+        'RogerBot': r'rogerbot',
+        'ScreamingFrog': r'Screaming Frog',
+        'Sitebulb': r'sitebulb',
         'ImagesiftBot': r'ImagesiftBot',
+        'PingdomBot': r'Pingdom\.com_bot',
     }
 
     # Configuración de regiones basadas en URL
