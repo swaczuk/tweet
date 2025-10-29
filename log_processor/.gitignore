@@ -1,0 +1,44 @@
+# Archivos de datos
+*.zip
+*.txt
+*.json
+!config.example.json
+!requirements.txt
+
+# Credenciales de GCP
+*.json
+credentials*.json
+*-credentials.json
+service-account*.json
+
+# Directorios temporales
+temp_*/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs de sistema
+*.log
+
+# Cache de Python
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
