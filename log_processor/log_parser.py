@@ -23,17 +23,21 @@ class LogEntry:
     user_agent: str
     region: Optional[str] = None
     bot_name: Optional[str] = None
+    date: Optional[str] = None  # Fecha en formato YYYY-MM-DD
 
 
 class LogParser:
     """Parser para archivos de log de servidor"""
 
-    # Expresión regular para formato Combined Log (Apache/Nginx)
-    # Formato: IP - - [timestamp] "METHOD /path HTTP/1.1" status size "referer" "user-agent"
+    # Expresión regular para el formato de log personalizado
+    # Formato: IP - - DD/MM/YYYY HH:MM:SS AM/PM "METHOD URL HTTP/1.1" status num1 num2 "" "user-agent"
+    # Ejemplo: 10.201.52.5 - - 25/09/2025 08:05:31 PM "GET https://www.ajg.com/uk/... HTTP/1.1" 200 100 100  "" "Mozilla/5.0..."
     LOG_PATTERN = re.compile(
-        r'(?P<ip>[\d\.]+) - - \[(?P<timestamp>[^\]]+)\] '
-        r'"(?P<method>\w+) (?P<url>[^\s]+) HTTP/[^"]+" '
-        r'(?P<status>\d+) (?P<size>\d+|-) "(?P<referer>[^"]*)" "(?P<user_agent>[^"]*)"'
+        r'(?P<ip>[\d\.]+) - - '
+        r'(?P<timestamp>\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2} (?:AM|PM)) '
+        r'"(?P<method>\w+) (?P<url>\S+) HTTP/[^"]+" '
+        r'(?P<status>\d+) (?P<size1>\d+) (?P<size2>\d+)\s+'
+        r'"[^"]*" "(?P<user_agent>[^"]*)"'
     )
 
     # Lista de bots conocidos con patrones para detectarlos en User-Agent
@@ -78,14 +82,18 @@ class LogParser:
     }
 
     # Configuración de regiones basadas en URL
+    # El orden es importante: las regiones más específicas deben ir primero
     REGION_PATTERNS = {
-        'AU': r'/au/',
-        'UK': r'/uk/',
-        'CA': r'/ca/',
-        'CA-FR': r'/ca-fr/',
-        'RPS': r'rpsins\.com',
+        'AJG-UK': r'ajg\.com/uk/',
+        'AJG-AU': r'ajg\.com/au/',
+        'AJG-CA-FR': r'ajg\.com/ca-fr/',
+        'AJG-CA': r'ajg\.com/ca/',
+        'GB-AU': r'gallagherbassett\.com/au/',
+        'GB-UK': r'gallagherbassett\.com/uk/',
         'GB': r'gallagherbassett\.com',
-        'MAIN': r'^www\.ajg\.com(?!/(?:au|uk|ca|ca-fr))',  # Sitio principal sin subdirectorios regionales
+        'RPS': r'rpsins\.com',
+        'ARTEX': r'artexrisk\.com',
+        'AJG-MAIN': r'ajg\.com',  # Sitio principal (debe ir al final)
     }
 
     def __init__(self, custom_bots: Dict[str, str] = None):
@@ -136,25 +144,39 @@ class LogParser:
         Returns:
             Código de región o 'UNKNOWN'
         """
-        # Primero verificar subdominios específicos
-        if 'rpsins.com' in url:
-            return 'RPS'
-        if 'gallagherbassett.com' in url:
-            return 'GB'
-
-        # Luego verificar paths regionales
+        # Verificar todos los patrones en orden (los más específicos primero)
+        # El orden está definido en REGION_PATTERNS
         for region, pattern in self.compiled_region_patterns.items():
             if pattern.search(url):
                 return region
 
         return 'UNKNOWN'
 
+    def parse_date(self, timestamp: str) -> Optional[str]:
+        """
+        Parsea el timestamp y extrae la fecha en formato YYYY-MM-DD.
+
+        Args:
+            timestamp: Timestamp en formato "DD/MM/YYYY HH:MM:SS AM/PM"
+
+        Returns:
+            Fecha en formato "YYYY-MM-DD" o None si no se puede parsear
+        """
+        try:
+            from datetime import datetime
+            # Timestamp formato: "25/09/2025 08:05:31 PM"
+            dt = datetime.strptime(timestamp, "%d/%m/%Y %I:%M:%S %p")
+            return dt.strftime("%Y-%m-%d")
+        except Exception as e:
+            logger.warning(f"No se pudo parsear timestamp '{timestamp}': {e}")
+            return None
+
     def parse_line(self, line: str) -> Optional[LogEntry]:
         """
         Parsea una línea de log.
 
         Args:
-            line: Línea de log en formato combined
+            line: Línea de log en formato personalizado
 
         Returns:
             LogEntry o None si no se puede parsear
@@ -166,6 +188,7 @@ class LogParser:
         data = match.groupdict()
         user_agent = data['user_agent']
         url = data['url']
+        timestamp = data['timestamp']
 
         bot_name = self.identify_bot(user_agent)
         if not bot_name:
@@ -173,16 +196,18 @@ class LogParser:
             return None
 
         region = self.identify_region(url)
+        date = self.parse_date(timestamp)
 
         return LogEntry(
             ip=data['ip'],
-            timestamp=data['timestamp'],
+            timestamp=timestamp,
             method=data['method'],
             url=url,
             status_code=data['status'],
             user_agent=user_agent,
             region=region,
-            bot_name=bot_name
+            bot_name=bot_name,
+            date=date
         )
 
     def parse_file(self, file_path: str) -> List[LogEntry]:
