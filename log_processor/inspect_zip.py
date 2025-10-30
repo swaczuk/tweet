@@ -74,7 +74,8 @@ def inspect_zip(zip_path: str, num_lines: int = 20):
                         print(f"  - Longitud: {len(first_line)} caracteres")
                         has_quotes = '"' in first_line
                         print(f"  - Contiene comillas dobles: {'Sí' if has_quotes else 'No'}")
-                        print(f"  - Número de comillas: {first_line.count('\"')}")
+                        quote_count = first_line.count('"')
+                        print(f"  - Número de comillas: {quote_count}")
                         is_ip = first_line.split()[0].replace('.', '').isdigit() if first_line.split() else False
                         print(f"  - Comienza con IP: {'Sí' if is_ip else 'No'}")
                         has_method = 'GET' in first_line or 'POST' in first_line
