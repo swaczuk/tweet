@@ -22,7 +22,7 @@ import json
 
 # Importar módulos del proyecto
 from zip_extractor import ZipExtractor
-from log_parser import LogParser
+from simple_parser import SimpleLogParser
 from data_aggregator import DataAggregator
 from bigquery_uploader import BigQueryUploader
 
@@ -60,7 +60,8 @@ class LogProcessor:
         self.credentials_path = credentials_path
         self.top_n = top_n
 
-        self.parser = LogParser(custom_bots=custom_bots)
+        self.parser = SimpleLogParser()
+        # Note: custom_bots not yet supported in SimpleLogParser
         self.aggregator = DataAggregator()
 
     def process_zip(self, zip_path: str) -> int:

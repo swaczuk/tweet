@@ -6,7 +6,7 @@ from typing import List, Dict, Tuple
 from dataclasses import dataclass
 import logging
 
-from log_parser import LogEntry
+from simple_parser import SimpleLogEntry as LogEntry
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -239,7 +239,7 @@ class DataAggregator:
 if __name__ == "__main__":
     # Ejemplo de uso
     import sys
-    from log_parser import LogParser
+    from simple_parser import SimpleLogParser
 
     if len(sys.argv) < 2:
         print("Uso: python data_aggregator.py <ruta_al_log>")
@@ -248,7 +248,7 @@ if __name__ == "__main__":
     log_file = sys.argv[1]
 
     # Parsear log
-    parser = LogParser()
+    parser = SimpleLogParser()
     entries = parser.parse_file(log_file)
 
     # Agregar datos
