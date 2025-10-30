@@ -72,10 +72,13 @@ def inspect_zip(zip_path: str, num_lines: int = 20):
 
                         print(f"\nCaracterísticas:")
                         print(f"  - Longitud: {len(first_line)} caracteres")
-                        print(f"  - Contiene comillas dobles: {'Sí' if '\"' in first_line else 'No'}")
+                        has_quotes = '"' in first_line
+                        print(f"  - Contiene comillas dobles: {'Sí' if has_quotes else 'No'}")
                         print(f"  - Número de comillas: {first_line.count('\"')}")
-                        print(f"  - Comienza con IP: {'Sí' if first_line.split()[0].replace('.', '').isdigit() else 'No'}")
-                        print(f"  - Contiene 'GET' o 'POST': {'Sí' if 'GET' in first_line or 'POST' in first_line else 'No'}")
+                        is_ip = first_line.split()[0].replace('.', '').isdigit() if first_line.split() else False
+                        print(f"  - Comienza con IP: {'Sí' if is_ip else 'No'}")
+                        has_method = 'GET' in first_line or 'POST' in first_line
+                        print(f"  - Contiene 'GET' o 'POST': {'Sí' if has_method else 'No'}")
 
                         # Buscar User-Agent común
                         if '"' in first_line:
