@@ -5,7 +5,30 @@ Script para inspeccionar el contenido de un ZIP y ver formato real de los logs.
 import zipfile
 import sys
 import os
+import tempfile
+import shutil
 from pathlib import Path
+
+def extract_nested_zips(zip_path: str, extract_dir: str):
+    """Extrae ZIPs recursivamente y devuelve lista de archivos .txt"""
+    txt_files = []
+
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        zf.extractall(extract_dir)
+
+        for root, dirs, files in os.walk(extract_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+
+                if file.endswith('.zip'):
+                    # Extraer ZIP anidado recursivamente
+                    nested_dir = os.path.join(root, file + '_extracted')
+                    os.makedirs(nested_dir, exist_ok=True)
+                    txt_files.extend(extract_nested_zips(file_path, nested_dir))
+                elif file.endswith('.txt'):
+                    txt_files.append(file_path)
+
+    return txt_files
 
 def inspect_zip(zip_path: str, num_lines: int = 20):
     """Inspecciona archivos dentro del ZIP"""
@@ -13,13 +36,15 @@ def inspect_zip(zip_path: str, num_lines: int = 20):
     print(f"Inspeccionando: {zip_path}")
     print("="*80)
 
-    with zipfile.ZipFile(zip_path, 'r') as zf:
-        # Listar todos los archivos
-        all_files = zf.namelist()
-        txt_files = [f for f in all_files if f.endswith('.txt')]
+    # Crear directorio temporal
+    temp_dir = tempfile.mkdtemp(prefix='inspect_zip_')
 
-        print(f"\nTotal de archivos en ZIP: {len(all_files)}")
-        print(f"Archivos .txt encontrados: {len(txt_files)}")
+    try:
+        # Extraer ZIPs anidados
+        print("\nExtrayendo ZIPs anidados...")
+        txt_files = extract_nested_zips(zip_path, temp_dir)
+
+        print(f"\nArchivos .txt encontrados: {len(txt_files)}")
 
         if not txt_files:
             print("\n⚠️  No se encontraron archivos .txt")
@@ -27,13 +52,13 @@ def inspect_zip(zip_path: str, num_lines: int = 20):
 
         # Mostrar lista de archivos .txt
         print(f"\n{'='*80}")
-        print("ARCHIVOS .TXT EN EL ZIP:")
+        print("ARCHIVOS .TXT ENCONTRADOS:")
         print(f"{'='*80}")
         for i, txt_file in enumerate(txt_files, 1):
-            file_info = zf.getinfo(txt_file)
-            size_kb = file_info.file_size / 1024
-            print(f"{i}. {txt_file}")
+            size_kb = os.path.getsize(txt_file) / 1024
+            print(f"{i}. {os.path.basename(txt_file)}")
             print(f"   Tamaño: {size_kb:.1f} KB")
+            print(f"   Ruta: {txt_file}")
 
         # Analizar el primer archivo .txt no vacío
         print(f"\n{'='*80}")
@@ -41,23 +66,19 @@ def inspect_zip(zip_path: str, num_lines: int = 20):
         print(f"{'='*80}")
 
         for txt_file in txt_files:
-            with zf.open(txt_file) as f:
-                lines = []
-                try:
-                    content = f.read().decode('utf-8', errors='ignore')
-                    lines = content.split('\n')
-                except:
-                    continue
+            try:
+                with open(txt_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
 
                 if len(lines) > 0 and any(line.strip() for line in lines):
-                    print(f"\nArchivo: {txt_file}")
+                    print(f"\nArchivo: {os.path.basename(txt_file)}")
                     print(f"Total de líneas: {len(lines)}")
                     print(f"\nPrimeras {num_lines} líneas:")
                     print("-"*80)
 
                     for i, line in enumerate(lines[:num_lines], 1):
                         if line.strip():
-                            print(f"{i:3d}| {line[:200]}")  # Mostrar primeros 200 caracteres
+                            print(f"{i:3d}| {line[:200].rstrip()}")  # Mostrar primeros 200 caracteres
 
                     # Analizar formato
                     print(f"\n{'='*80}")
@@ -66,7 +87,7 @@ def inspect_zip(zip_path: str, num_lines: int = 20):
 
                     non_empty_lines = [l for l in lines if l.strip()]
                     if non_empty_lines:
-                        first_line = non_empty_lines[0]
+                        first_line = non_empty_lines[0].strip()
                         print(f"\nPrimera línea completa:")
                         print(first_line)
 
@@ -90,6 +111,8 @@ def inspect_zip(zip_path: str, num_lines: int = 20):
                                     print(f"    Parte {i}: {part[:100]}")
 
                     break  # Solo mostrar el primer archivo con contenido
+            except Exception as e:
+                continue
 
         # Buscar patterns de bots en todo el archivo
         print(f"\n{'='*80}")
@@ -103,26 +126,31 @@ def inspect_zip(zip_path: str, num_lines: int = 20):
         ]
 
         for txt_file in txt_files[:5]:  # Solo primeros 5 archivos
-            with zf.open(txt_file) as f:
-                try:
-                    content = f.read().decode('utf-8', errors='ignore')
-                    lines = content.split('\n')
+            try:
+                with open(txt_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
 
-                    bot_lines = []
-                    for line in lines[:1000]:  # Primeras 1000 líneas
-                        for keyword in bot_keywords:
-                            if keyword in line:
-                                bot_lines.append((keyword, line[:200]))
-                                break
+                bot_lines = []
+                for line in lines[:1000]:  # Primeras 1000 líneas
+                    for keyword in bot_keywords:
+                        if keyword in line:
+                            bot_lines.append((keyword, line[:200].rstrip()))
+                            break
 
-                    if bot_lines:
-                        print(f"\n{txt_file}:")
-                        print(f"  Encontradas {len(bot_lines)} líneas con bots")
-                        print(f"  Ejemplos:")
-                        for keyword, line in bot_lines[:3]:
-                            print(f"    [{keyword}] {line}")
-                except:
-                    continue
+                if bot_lines:
+                    print(f"\n{os.path.basename(txt_file)}:")
+                    print(f"  Encontradas {len(bot_lines)} líneas con bots")
+                    print(f"  Ejemplos:")
+                    for keyword, line in bot_lines[:3]:
+                        print(f"    [{keyword}] {line}")
+            except:
+                continue
+
+    finally:
+        # Limpiar directorio temporal
+        print(f"\n{'='*80}")
+        print(f"Limpiando archivos temporales...")
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
