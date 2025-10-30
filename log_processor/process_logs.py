@@ -87,12 +87,21 @@ class LogProcessor:
 
             # Parsear cada archivo de log
             total_entries = 0
-            for txt_file in txt_files:
-                entries = self.parser.parse_file(txt_file)
+            total_lines_processed = 0
+            for i, txt_file in enumerate(txt_files, 1):
+                logger.info(f"Procesando archivo {i}/{len(txt_files)}: {txt_file}")
+                entries = self.parser.parse_file(txt_file, verbose=False)
                 self.aggregator.add_entries(entries)
                 total_entries += len(entries)
 
-            logger.info(f"Total de entradas de bots procesadas: {total_entries}")
+                # Count lines in file
+                with open(txt_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    total_lines_processed += sum(1 for _ in f)
+
+            logger.info(f"Total de líneas procesadas: {total_lines_processed:,}")
+            logger.info(f"Total de entradas de bots detectadas: {total_entries:,}")
+            if total_lines_processed > 0:
+                logger.info(f"Tasa de detección: {total_entries/total_lines_processed*100:.1f}%")
             return total_entries
 
     def upload_to_bigquery(self, month: str, replace: bool = False) -> int:

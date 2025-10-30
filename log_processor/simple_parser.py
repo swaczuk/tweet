@@ -172,7 +172,7 @@ class SimpleLogParser:
         except:
             return None
 
-    def parse_file(self, file_path: str):
+    def parse_file(self, file_path: str, verbose: bool = True):
         """Parsea archivo completo"""
         entries = []
         total_lines = 0
@@ -186,8 +186,11 @@ class SimpleLogParser:
                     entries.append(entry)
                     bot_lines += 1
 
-        print(f"Total líneas: {total_lines}")
-        print(f"Bots detectados: {bot_lines} ({bot_lines/total_lines*100:.1f}%)")
+        if verbose and total_lines > 0:
+            print(f"Total líneas: {total_lines}")
+            print(f"Bots detectados: {bot_lines} ({bot_lines/total_lines*100:.1f}%)")
+        elif verbose:
+            print(f"Archivo vacío o sin contenido válido")
 
         return entries
 
